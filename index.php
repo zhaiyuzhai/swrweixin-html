@@ -89,13 +89,14 @@ $signPackage = $jssdk->GetSignPackage();
 </head>
 <body>
     <div class="container">
-            <div class="temInside">
-                <p class="title">温度</p>
-                <p class="temShow"><span id="temShow_num">30.0</span>℃</p>
-            </div>
-            <span class="icon icon_refresh"></span>
-            <span class="icon icon_tem" id="btn"></span>
-            <span class="icon icon_chart"></span>
+        <div class="temInside">
+            <p class="title">温度</p>
+            <p class="temShow"><span id="temShow_Num">30.0</span>℃</p>
+        </div>
+        <div id="test"></div>
+        <span class="icon icon_refresh"></span>
+        <span class="icon icon_tem" id="btn"></span>
+        <span class="icon icon_chart"></span>
     </div>
     <!--    将页面上方图设置为正方形，然后才可以加圆角-->
     <script>
@@ -107,7 +108,7 @@ $signPackage = $jssdk->GetSignPackage();
     <!--引入base64来对接收的数据进行解码-->
     <script src="js/base64.min.js"></script>
     <script>
-        var deviceId;
+        var deviceId=[];
 //        微信配置信息
         wx.config({
             beta:true,
@@ -133,118 +134,137 @@ $signPackage = $jssdk->GetSignPackage();
                 'onReceiveDataFromWXDevice'
             ]
         });
-//        微信配置完成后的执行函数，介于wx.config是异步的
-wx.ready(function () {
-    // 在这里调用 API
-//      1、  打开设备的硬件功能
-    wx.invoke('openWXDeviceLib',{'brandUserName':'gh_e09af6572b88'}, function(res){
-        //这里是回调函数
-        if(res.isSupportBLE=="no"){
-            alert("您的设备不支持此蓝牙设备")
-        }
-        if(res.bluetoothState=='unauthorized'){
-            alert("请您授权设备的蓝牙功能，并打开")
-        }
-    });
-//  2、 让微信去连接蓝牙设备
-    wx.invoke("connectWXDevice",{"deviceId":deviceId},function(res){
-        alert("连接的信息为："+res.err_msg);
-    });
-//    暂定发送的频率为200ms每次
-    sendData([0xA8,0x07]);
-//    自动开始，退出页面结束
-    sendData([0xA2]);
-//    当设备接收到数据的时候，返回给jsapi，HTML页面
-    wx.on('onReceiveDataFromWXDevice',function(res){
-        $("#temShow_num").html(getNumFromRaw(res.base64Data));
-    });
-});
-/*发送数据到硬件设备,直接输入,写成数组形式*/
-function sendData(arr) {
-    /*封装了处理十六字节数组转换为base64的方法*/
-    function orderAraay(arr){
-        //FE 01 00 0F 75 31 00 00 0A 00 12 01 57 18 00
-        var Bytes=new Array();
-        for(var i=0;i<arr.length;i++){
-            Bytes[i]=arr[i];
-        }
-        return Bytes;
-    }
-    /*根据微信官方文档说明，发送的指令数据必须是base64编码，所以还必须有个转换方法。
-    *  Byte数组转Base64字符,原理同上
-    * @Param [0x00,0x00]
-    * @return Base64字符串
-    **/
-    function arrayToBase64(array) {
-        if (array.length == 0) {
-            return "";
-        }
-        var b64Chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-        var result = "";
-        // 给末尾添加的字符,先计算出后面的字符
-        var d3 = array.length % 3;
-        var endChar = "";
-        if (d3 == 1) {
-            var value = array[array.length - 1];
-            endChar = b64Chars.charAt(value >> 2);
-            endChar += b64Chars.charAt((value << 4) & 0x3F);
-            endChar += "==";
-        } else if (d3 == 2) {
-            var value1 = array[array.length - 2];
-            var value2 = array[array.length - 1];
-            endChar = b64Chars.charAt(value1 >> 2);
-            endChar += b64Chars.charAt(((value1 << 4) & 0x3F) + (value2 >> 4));
-            endChar += b64Chars.charAt((value2 << 2) & 0x3F);
-            endChar += "=";
-        }
-        var times = array.length / 3;
-        var startIndex = 0;
-        // 开始计算
-        for (var i = 0; i < times - (d3 == 0 ? 0 : 1); i++) {
-            startIndex = i * 3;
-            var S1 = array[startIndex + 0];
-            var S2 = array[startIndex + 1];
-            var S3 = array[startIndex + 2];
+        //        微信配置完成后的执行函数，介于wx.config是异步的
+        wx.ready(function () {
+            // 在这里调用 API
+        //  1、  打开设备的硬件功能
+            wx.invoke('openWXDeviceLib',{'brandUserName':'gh_e09af6572b88'}, function(res){
+//                alert("open")
+                //这里是回调函数
+                if(res.isSupportBLE=="no"){
+                    alert("您的设备不支持此蓝牙设备");
+                }
+                if(res.bluetoothState=='unauthorized'){
+                    alert("请您授权设备的蓝牙功能，并打开");
+                }
+//                获取设备的信息，deviceid值
+                wx.invoke('getWXDeviceInfos', {}, function(res){
+                    var len=res.deviceInfos.length;  //绑定设备总数量
+                    for(i=0; i<len;i++)
+                    {
+                        if(res.deviceInfos[i].state==="connected"){
+                            deviceId.push(res.deviceInfos[i].deviceId);
+//                            $("#test").append("<p>"+JSON.stringify(res.deviceInfos[i])+'</p>');
+                        }
+                    }
+//                    alert(deviceId.length);
+                    //  3、 暂定发送的频率为200ms每次
+                    sendData([0xA8,0x07]);
+                    //      自动开始，退出页面结束
+                    sendData([0xA2]);
+                });
+            });
+        //  2、 让微信去连接蓝牙设备
+//            wx.invoke("connectWXDevice",{"deviceId":deviceId},function(res){
+//                alert("连接")
+//                alert("连接的信息为："+res.err_msg);
+//            });
 
-            var s1 = b64Chars.charAt(S1 >> 2);
-            var s2 = b64Chars.charAt(((S1 << 4) & 0x3F) + (S2 >> 4));
-            var s3 = b64Chars.charAt(((S2 & 0xF) << 2) + (S3 >> 6));
-            var s4 = b64Chars.charAt(S3 & 0x3F);
-            // 添加到结果字符串中
-            result += (s1 + s2 + s3 + s4);
+        //  当设备接收到数据的时候，返回给HTML页面，jsapi。
+            wx.on('onReceiveDataFromWXDevice',function(res){
+//                alert(res.base64Data);
+//                alert(getNumFromRaw(res.base64Data));
+                $("#temShow_Num").html(getNumFromRaw(res.base64Data));
+            });
+        });
+        /*发送数据到硬件设备,直接输入,写成数组形式*/
+        function sendData(arr) {
+            /*封装了处理十六字节数组转换为base64的方法*/
+            function orderAraay(arr){
+                //FE 01 00 0F 75 31 00 00 0A 00 12 01 57 18 00
+                var Bytes=new Array();
+                for(var i=0;i<arr.length;i++){
+                    Bytes[i]=arr[i];
+                }
+                return Bytes;
+            }
+            /*根据微信官方文档说明，发送的指令数据必须是base64编码，所以还必须有个转换方法。
+            *  Byte数组转Base64字符,原理同上
+            * @Param [0x00,0x00]
+            * @return Base64字符串
+            **/
+            function arrayToBase64(array) {
+                if (array.length == 0) {
+                    return "";
+                }
+                var b64Chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+                var result = "";
+                // 给末尾添加的字符,先计算出后面的字符
+                var d3 = array.length % 3;
+                var endChar = "";
+                if (d3 == 1) {
+                    var value = array[array.length - 1];
+                    endChar = b64Chars.charAt(value >> 2);
+                    endChar += b64Chars.charAt((value << 4) & 0x3F);
+                    endChar += "==";
+                } else if (d3 == 2) {
+                    var value1 = array[array.length - 2];
+                    var value2 = array[array.length - 1];
+                    endChar = b64Chars.charAt(value1 >> 2);
+                    endChar += b64Chars.charAt(((value1 << 4) & 0x3F) + (value2 >> 4));
+                    endChar += b64Chars.charAt((value2 << 2) & 0x3F);
+                    endChar += "=";
+                }
+                var times = array.length / 3;
+                var startIndex = 0;
+                // 开始计算
+                for (var i = 0; i < times - (d3 == 0 ? 0 : 1); i++) {
+                    startIndex = i * 3;
+                    var S1 = array[startIndex + 0];
+                    var S2 = array[startIndex + 1];
+                    var S3 = array[startIndex + 2];
+
+                    var s1 = b64Chars.charAt(S1 >> 2);
+                    var s2 = b64Chars.charAt(((S1 << 4) & 0x3F) + (S2 >> 4));
+                    var s3 = b64Chars.charAt(((S2 & 0xF) << 2) + (S3 >> 6));
+                    var s4 = b64Chars.charAt(S3 & 0x3F);
+                    // 添加到结果字符串中
+                    result += (s1 + s2 + s3 + s4);
+                }
+                return result + endChar;
+            }
+            var base64Data=arrayToBase64(orderAraay(arr));
+            for(var i=0;i<deviceId.length;i++){
+                wx.invoke('sendDataToWXDevice', {'deviceId':deviceId[i], 'base64Data':base64Data}, function(res){
+//                    alert(res.err_msg);
+                });
+            }
         }
-        return result + endChar;
-    }
-    var base64Data=arrayToBase64(orderAraay(arr));
-    wx.invoke('sendDataToWXDevice', {'deviceId':deviceId, 'base64Data':base64Data}, function(res) {
-        alert(res.err_msg);
-    });
-}
-/*******解码成10进制的数据*/
-function baseToString_10(msg) {
-    var str='';
-    var wx=Base64.decode(msg);
-    for(var i=0;i<wx.length;i++){
-        str+=wx.charCodeAt(i)+";";
-    }
-    return str;
-}
-/*将收到的数据进行解析，得到可用实际值*/
-function getNumFromRaw(msg) {
-//    需要获取到接受的数据的第2,3字节的数据来进行转码
-    var str='';
-    var wx=Base64.decode(msg);
-    if(wx.length<=2){
-        return "";
-    } else{
-        for(var i=0;i<wx.length;i++){
-            str+=wx.charCodeAt(i)+";";
+        /*******解码成10进制的数据*/
+        function baseToString_10(msg) {
+            var str='';
+            var wx=Base64.decode(msg);
+            for(var i=0;i<wx.length;i++){
+                str+=wx.charCodeAt(i)+";";
+            }
+            return str;
         }
-        var newArray=str.split(";");
-        var num=newArray[2]*256+parseInt(newArray[1]);
-        return (num/100).toFixed(1);
-    }
-}
+        /*将收到的数据进行解析，得到可用实际值*/
+        function getNumFromRaw(msg) {
+        //    需要获取到接受的数据的第2,3字节的数据来进行转码
+            var str='';
+            var wx=Base64.decode(msg);
+            if(wx.length<=2){
+                return "";
+            } else{
+                for(var i=0;i<wx.length;i++){
+                    str+=wx.charCodeAt(i)+";";
+                }
+                var newArray=str.split(";");
+                var num=newArray[2]*256+parseInt(newArray[1]);
+                return (num/100).toFixed(1);
+            }
+        }
     </script>
 </body>
 </html>
