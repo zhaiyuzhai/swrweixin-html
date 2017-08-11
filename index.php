@@ -10,7 +10,6 @@ $signPackage = $jssdk->GetSignPackage();
     <meta name="viewport"
           content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
     <title>Swr</title>
-    <script src="js/zepto.min.js"></script>
     <style>
         @font-face {
             font-family: "font-Awesome";
@@ -18,6 +17,9 @@ $signPackage = $jssdk->GetSignPackage();
         }
         body,p{
             margin:0px;
+        }
+        span{
+            -webkit-tap-highlight-color: transparent;
         }
         .container{
             position:absolute;
@@ -77,15 +79,36 @@ $signPackage = $jssdk->GetSignPackage();
             content: "\f201";
         }
         .icon_refresh{
-            left:86%;
-            top:60%;
+            left:90%;
+            top:40%;
             font-size: 30px;
             color: #e4393c;
         }
         .icon_refresh:before{
             content: "\f021";
         }
+        /*主要绘图区的容器*/
+        #charts{
+            visibility: hidden;
+            margin:0 auto;
+            margin-top:10%;
+            width:100%;
+            height:45%;
+            /*background-color: #0BB20C;*/
+        }
+        /*温度计的图片*/
+        #img{
+            position: absolute;
+            top:40%;
+            left:50%;
+            transform: translate(-50%,0%);
+            width:73px;
+            height:300px;
+            background: url("img/tem.png") no-repeat;
+            background-size: 100% 100%;
+        }
     </style>
+    <script src="js/zepto.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -93,15 +116,104 @@ $signPackage = $jssdk->GetSignPackage();
             <p class="title">温度</p>
             <p class="temShow"><span id="temShow_Num">30.0</span>℃</p>
         </div>
-        <div id="test"></div>
-        <span class="icon icon_refresh"></span>
-        <span class="icon icon_tem" id="btn"></span>
-        <span class="icon icon_chart"></span>
+        <div id="charts"></div>
+        <div id="img"></div>
+        <span class="icon icon_refresh" id="refresh"></span>
+        <span class="icon icon_tem" id="btn_img"></span>
+        <span class="icon icon_chart" id="btn_charts"></span>
     </div>
+
+    <script src="js/echarts.common.min.js"></script>
     <!--    将页面上方图设置为正方形，然后才可以加圆角-->
     <script>
         var wid=$(".temInside").width();
         $(".temInside").height(wid);
+//        按钮的逻辑实现
+        $("#refresh").on("click",function () {
+            chartData.splice(0);
+            xTime=0;
+            $("#refresh").css({
+                "transition":"all .5s linear",
+                "transform":"rotate(360deg)"
+            })
+            $("#refresh").on("transitionend",function () {
+                $("#refresh").css({
+                    "transition":"none",
+                    "transform":"rotate(0deg)"
+                })
+            })
+        });
+        $("#btn_img").on("click",function () {
+            $("#charts").css({
+                "visibility":"hidden"
+            })
+            $("#img").css({
+                "visibility":"visible"
+            });
+        });
+        $("#btn_charts").on("click",function () {
+
+            $("#charts").css({
+                "visibility":"visible"
+            })
+            $("#img").css({
+                "visibility":"hidden"
+            })
+        });
+    </script>
+<!--    绘制charts-->
+    <script>
+        var chartData=[];
+        var xTime=0;
+        var myChart = echarts.init(document.getElementById('charts'));
+        var option = {
+//            tooltip:{
+//                show:true,
+//                trigger:"axis",
+//                axisPointer:{
+//                    type:"line",
+//                    lineStyle:{
+//                        color:"#fff"
+//                    }
+//                }
+//            },
+            gird:{
+                containLabel:true,
+                left:"10%",
+                right:"3%"
+            },
+            dataZoom: [
+                {
+                    id: 'dataZoomX',
+                    type: 'inside',
+                    xAxisIndex: [0]
+                }
+            ],
+            xAxis:{
+//                axisLine:{onZero:false},
+                type: 'value',
+//                boundaryGap: [0, '50%'],
+                name:"ms"
+            },
+            yAxis: {
+//                axisLine:{onZero:false},
+                type: 'value',
+//                boundaryGap: [0, '90%'],
+                name:"温度/℃"
+            },
+            series:{
+                type: 'line',
+                showSymbol: false,
+                data:chartData
+            }
+        }
+        myChart.showLoading();
+//        setInterval(function(){
+//            myChart.hideLoading();
+//            xTime+=200;
+//            chartData.push([xTime,22]);
+//            myChart.setOption(option);
+//        },1000);
     </script>
     <!--/*引入jssdk来实现功能*/-->
     <script src="http://res.wx.qq.com/open/js/jweixin-1.2.0.js"></script>
@@ -150,31 +262,35 @@ $signPackage = $jssdk->GetSignPackage();
 //                获取设备的信息，deviceid值
                 wx.invoke('getWXDeviceInfos', {}, function(res){
                     var len=res.deviceInfos.length;  //绑定设备总数量
-                    for(i=0; i<len;i++)
-                    {
-                        if(res.deviceInfos[i].state==="connected"){
-                            deviceId.push(res.deviceInfos[i].deviceId);
-//                            $("#test").append("<p>"+JSON.stringify(res.deviceInfos[i])+'</p>');
+                    if(len===0){
+                        alert("您还没有绑定设备！")
+                    }else {
+                        for (i = 0; i < len; i++) {
+                            if (res.deviceInfos[i].state === "connected") {
+                                deviceId.push(res.deviceInfos[i].deviceId);
+                            }
                         }
+                        //                    alert(deviceId.length);
+                        //  3、 暂定发送的频率为200ms每次
+                        sendData([0xA8, 0x07]);
+                        //      自动开始，退出页面结束
+                        setTimeout(function () {
+                            sendData([0xA2]);
+                        },200)
                     }
-//                    alert(deviceId.length);
-                    //  3、 暂定发送的频率为200ms每次
-                    sendData([0xA8,0x07]);
-                    //      自动开始，退出页面结束
-                    sendData([0xA2]);
                 });
             });
-        //  2、 让微信去连接蓝牙设备
-//            wx.invoke("connectWXDevice",{"deviceId":deviceId},function(res){
-//                alert("连接")
-//                alert("连接的信息为："+res.err_msg);
-//            });
-
         //  当设备接收到数据的时候，返回给HTML页面，jsapi。
             wx.on('onReceiveDataFromWXDevice',function(res){
+                myChart.hideLoading();
+                xTime+=200;
 //                alert(res.base64Data);
 //                alert(getNumFromRaw(res.base64Data));
-                $("#temShow_Num").html(getNumFromRaw(res.base64Data));
+                var getNum=getNumFromRaw(res.base64Data);
+                $("#temShow_Num").html(getNum);
+//                echarts绘图
+                chartData.push([xTime,getNum]);
+                myChart.setOption(option);
             });
         });
         /*发送数据到硬件设备,直接输入,写成数组形式*/
